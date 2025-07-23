@@ -29,6 +29,7 @@ Here is how it works:
     ```
 ## Tech Stack
 - Python
+- Jupyter Notebook
 - Streamlit
 - Firebase
 - Gemini AI
