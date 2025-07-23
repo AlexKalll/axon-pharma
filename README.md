@@ -1,7 +1,7 @@
 
 # Axon Pharmacy | Function Calling With LLM
 
-This is an app that allows admin to generate and post announcements to Telegram channels and groups. It also allows users to search for medicines, view medicine details, place orders, view order status, and cancel orders. All done with just a random prompt to Gemini AI.
+This is an app that allows admin to generate and post announcements to Telegram channels and groups, add medicines to the database, update stock, delete medicines, and update order status. It also allows users to search for medicines, view medicine details, place orders, view order status, and cancel orders. All done with just a random prompt to Gemini AI.
 
 Here is how it works:
 ![How the function calling works?](assets/image.png)
