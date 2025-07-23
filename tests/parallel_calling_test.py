@@ -123,8 +123,8 @@ try:
         )
 
         # Append function call and result of the function execution to contents
-        contents.append(response.candidates[0].content) # Append the content from the model's response.
-        contents.append(types.Content(role="user", parts=[function_response_part])) # Append the function response
+        contents.append(response.candidates[0].content) # append content from the model's response.
+        contents.append(types.Content(role="user", parts=[function_response_part])) # apped the function response
 
     final_response = client.models.generate_content(
         model="gemini-2.5-flash",
