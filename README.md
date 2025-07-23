@@ -33,6 +33,7 @@ Here is how it works:
 - Firebase
 - Gemini AI
 - Telegram API
+- Telegram Bot Integration
 - API Integration
 - Database Management
 
