@@ -214,13 +214,10 @@ def update_order_status(order_id: str, status: str) -> dict[str, str]:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-
 # Initialize chat session
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Login Section
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -239,9 +236,9 @@ if not st.session_state.logged_in:
                 st.error("Invalid credentials")
     st.stop()
 
-# Main App
+# app
 with st.sidebar:
-    st.title(f"Welcome, Admin ⚙️")
+    st.title(f"Welcome, Admin⚙️")
 
     st.markdown("---")
     st.info("System Status:")
@@ -260,7 +257,7 @@ with st.sidebar:
         st.rerun()
 
 # Chat Interface
-st.title("💊 Axon Pharmacy Service Automation with LLM")
+st.title("Axon Pharmacy Service Automation with LLM")
 st.caption("Chat with the admin assistant to manage your pharmacy")
 
 for message in st.session_state.messages:
