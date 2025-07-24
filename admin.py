@@ -4,13 +4,13 @@ import streamlit as st
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-import firebase_admin
-from firebase_admin import credentials, firestore
 from datetime import datetime
 import hashlib
-from typing import Optional, List, Dict
 
-from function_declarations import telegram_post_function, add_medicine_function, stock_out_function, add_stock_function, delete_medicine_function, update_order_status_function
+from function_declarations import (
+    telegram_post_function, add_medicine_function, 
+    stock_out_function, add_stock_function, 
+    delete_medicine_function, update_order_status_function)
 
 from firebase.db_manager import db
 
