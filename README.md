@@ -73,3 +73,25 @@ streamlit run admin.py # to run the admin page in Streamlit
 - **View Order Status:** Check the status of your order.
 - **Get Professional Advice:** Get advice from the llm based on his symptoms and profile details and order status.
 
+#### Key Insights and Ouptuts
+- **Streamlit:** Streamlit is a Python library for building interactive web applications.
+- **Firebase:** Firebase is a platform for building and deploying apps, databases, and other cloud services.
+- **Gemini AI:** Gemini AI is a platform for building and deploying LLMs.
+- **Telegram:** Telegram is a messaging and voice communication platform.
+
+This is a demo for How LLMs are powerful in automating pharmacy services. Take a look at in the sample output below that the model has done for the Pharmacy Admin...
+
+![Sample Output-1](assets\parallel_calling.jpg)
+- Here was the prompt given to the model 
+```
+write a telegram announcement regarding this that a new medicine 
+using telegram_post function called paracetamol is arrived and 
+record this medicine, and add 200 stock to the aspirin medicine, 
+and delete the asprin medicine since it is prohibited by the 
+government, and update the order status of order 
+0b527cd538844e7ab93c4f656f314cd7 to delivered.
+```
+
+![Sample Output-2](assets\parallel_calling1.jpg)
+
+It has been be able to call multiple functions at the same time.
