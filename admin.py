@@ -48,7 +48,6 @@ def authenticate_admin(email: str, password: str) -> bool:
         st.error(f"Authentication error: {e}")
         return False
 
-# Telegram Function
 def telegram_post(message: str) -> dict:
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     targets = {
@@ -175,7 +174,6 @@ if not st.session_state.logged_in:
                 st.error("Invalid credentials")
     st.stop()
 
-# app
 with st.sidebar:
     st.title(f"Welcome, Admin")
     st.caption(f"{st.session_state.admin}")
@@ -203,7 +201,6 @@ with st.sidebar:
     st.code(f"Medicines in DB: {len(db.collection('medicines').get())}")
     st.code(f"Pending orders: {len(db.collection('orders').where('status', '==', 'pending').get())}")
 
-# ui
 st.title("Axon Pharmacy Service Automation with LLM")
 st.caption("Chat with the admin assistant to manage your pharmacy")
 
