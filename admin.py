@@ -1,5 +1,3 @@
-# admin.py
-
 import os
 import requests
 import streamlit as st
@@ -14,47 +12,36 @@ from typing import Optional, List, Dict
 
 from function_declarations import telegram_post_function, add_medicine_function, stock_out_function, add_stock_function, delete_medicine_function, update_order_status_function
 
-# Load environment variables
+from firebase.db_manager import db
+
 load_dotenv()
-
-# Initialize Firebase
-if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_credentials.json")
-    firebase_admin.initialize_app(cred)
-
-db = firestore.client()
-
-# Initialize Gemini Client
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
-# Configure Streamlit page
 st.set_page_config(
     page_title="Axon Pharmacy Admin",
     page_icon="💊",
     layout="wide"
 )
 
-# Custom CSS
 st.markdown("""
 <style>
-    .admin-chat {background-color: #f0f2f6; border-radius: 10px; padding: 15px;}
-    .bot-chat {background-color: #e3f2fd; border-radius: 10px; padding: 15px;}
     .stButton>button {width: 100%;}
-    .sidebar .sidebar-content {background-color: #f8f9fa;}
 </style>
 """, unsafe_allow_html=True)
 
 # Authentication
 def authenticate_admin(email: str, password: str) -> bool:
     try:
+        if not email or not password: 
+            return False
+            
         admin_ref = db.collection("admins").document(email)
         admin_data = admin_ref.get()
         
         if admin_data.exists:
-            password = hashlib.sha256(password.encode()).hexdigest()
-
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
             stored_password = admin_data.to_dict().get("password")
-            if password == stored_password:
+            if hashed_password == stored_password:
                 return True
         return False
     except Exception as e:
@@ -63,16 +50,9 @@ def authenticate_admin(email: str, password: str) -> bool:
 
 # Telegram Function
 def telegram_post(message: str) -> dict:
-    """Post message the to Telegram channels
-    
-    Args:
-        message (str): The message to be posted to telegram channel and group that is should be in HTML format
-    Returns:
-        dict: A dictionary containing the result of the post request
-    """
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     targets = {
-        # 'channel': os.getenv('CHANNEL_USERNAME'),
+        'channel': os.getenv('CHANNEL_USERNAME'),
         'group': os.getenv('GROUP_USERNAME')
     }
     results = {}
@@ -97,22 +77,9 @@ def telegram_post(message: str) -> dict:
                 'success': False,
                 'error': str(e)
             }
-
     return results
 
-# Medicine Functions
 def add_medicine(name: str, unit_price: float = 15, stock: int = 100, madein: str = "USA", category: str = "General", description: str = "For quality health") -> dict:
-    """Add new medicine to Firestore database
-    Args:
-        name (str): The name of the medicine.
-        unit_price (number, optional): The unit price of the medicine.
-        stock (int, optional): The stock of the medicine. Defaults to 100.
-        madein (str, optional): The country of origin of the medicine. Defaults to USA.
-        category (str, optional): The category of the medicine. Defaults to "General".
-        description (str, optional): The description of the medicine. Defaults to "For quality health".
-    Returns:
-        dict: A dictionary of sucess and a message containing the name, unit price, stock, madein, category, description and created_at of the medicine or not sucess if the medicine already exists or registered.
-    """
     try:
         name = name.lower().replace(' ', '_')
         doc_ref = db.collection("medicines").document(name)
@@ -135,12 +102,6 @@ def add_medicine(name: str, unit_price: float = 15, stock: int = 100, madein: st
         return {"success": False, "error": str(e)}
 
 def stock_out(name: str) -> dict:
-    """updates medicine stock to 0 
-    Args:
-        name (str): The name of the medicine to update.
-    Returns:
-        dict: A dictionary containing the name of the medicine and a message as it is out of stock.
-    """
     try:
         name = name.lower().replace(' ', '_')
         docs = db.collection("medicines").document(name)
@@ -154,13 +115,6 @@ def stock_out(name: str) -> dict:
         return {"success": False, "error": str(e)}
 
 def add_stock(name: str, quantity: int) -> dict:
-    """updates a medicine stock
-    Args:
-        name (str): The name of the medicine to update.
-        quantity (int): The quantity to add to the stock.
-    Returns:
-        dict: A dictionary containing the name of the medicine and a message as it is out of stock.
-    """
     try:
         name = name.lower().replace(' ', '_')
         docs = db.collection("medicines").document(name)
@@ -175,18 +129,11 @@ def add_stock(name: str, quantity: int) -> dict:
         return {"success": False, "error": str(e)}
 
 def delete_medicine(name: str) -> dict:
-    """Delete a specific medicine collection from inventory totally.
-    Args:
-        name (str): The name of the medicine to delete.
-    Returns:
-        dict: A dictionary containing the result of the delete operation and a message that the medicine has been deleted.
-    """
     try:
         name = name.lower().replace(' ', '_')
         docs = db.collection("medicines").document(name)
         if docs:
             docs.delete()
-
             return {"success": True, 'message': f"{name} medicine has been deleted"}
         
         return {"success": False, "error": "Medicine not found"}
@@ -195,14 +142,6 @@ def delete_medicine(name: str) -> dict:
         return {"success": False, "error": str(e)}
 
 def update_order_status(order_id: str, status: str) -> dict[str, str]:
-    """
-    Update order status in Firestore
-    Args:
-        order_id (str): The ID of the order to update.
-        status (str): The new status of the order.
-
-    Returns:
-        dict: A dictionary containing the result of the update operation."""
     try:
         doc_ref = db.collection("orders").document(order_id)
         doc_ref.update({
@@ -238,14 +177,8 @@ if not st.session_state.logged_in:
 
 # app
 with st.sidebar:
-    st.title(f"Welcome, Admin⚙️")
-
-    st.markdown("---")
-    st.info("System Status:")
-    st.code(f"Admin: {st.session_state.admin}")
-    st.code(f"Medicines in DB: {len(db.collection('medicines').get())}")
-    st.code(f"Pending orders: {len(db.collection('orders').where('status', '==', 'pending').get())}")
-
+    st.title(f"Welcome, Admin")
+    st.caption(f"{st.session_state.admin}")
     st.markdown("---")
     st.info("Settings:")
     if st.button("Refresh"):
@@ -255,24 +188,36 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.session_state.clear()
         st.rerun()
+    st.markdown("---")
+    st.title("What can I do for you?")
+    st.markdown("""
+                - Automatic telegram post
+                - Add a new medicine 
+                - Stock out a medicine
+                - Add stock to a medicine
+                - Delete a medicine
+                - Update order status
+               """)
+    st.markdown("---")
+    st.info("Quick Infos:")
+    st.code(f"Medicines in DB: {len(db.collection('medicines').get())}")
+    st.code(f"Pending orders: {len(db.collection('orders').where('status', '==', 'pending').get())}")
 
-# Chat Interface
+# ui
 st.title("Axon Pharmacy Service Automation with LLM")
 st.caption("Chat with the admin assistant to manage your pharmacy")
 
-for message in st.session_state.messages:
+for message in st.session_state.messages:  
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if "function_result" in message:
-            with st.expander("Details"):
-                st.json(message["function_result"])
 
 if prompt := st.chat_input("Enter your message here..."):
-    # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.chat_message("🧑"):
         st.markdown(prompt)
+
+    contents = [ types.Content(role="user", parts=[types.Part(text=prompt)]) ]
 
     # generate response
     with st.chat_message("assistant"):
@@ -296,15 +241,11 @@ if prompt := st.chat_input("Enter your message here..."):
                 chat = client.chats.create(model = "gemini-2.5-flash", config=config)
                 response = chat.send_message(prompt)
 
-                contents = [
-                    types.Content(role="user", parts=[types.Part(text=prompt)])
-                ]
 
                 i = 0
                 functions_called = []
                 for fn in response.function_calls:
                     i += 1
-                    args = ", ".join([f"{k}={v}" for k, v in fn.args.items()])
                     st.info(f"{i}. Excuting: {fn.name}() function")
                     functions_called.append(fn.name)
                     
@@ -343,8 +284,9 @@ if prompt := st.chat_input("Enter your message here..."):
                     st.info(f"Function executed: {', '.join(functions_called)}")
                 if len(functions_called) > 1:
                     st.info(f"Functions executed are: {', '.join(functions_called)}")
-                    
+                   
                 st.markdown(final_response.text)
                     
             except Exception as e:
-                st.error("No response from AI, please try again later with quality prompts.")
+                st.warning("No response from AI, please try again later with quality prompts.")
+                
