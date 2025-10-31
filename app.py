@@ -204,8 +204,7 @@ def chat_page():
             user_ref = db.collection("users").document(st.session_state.user_email)
             user_ref.update({"chat_history": firestore.ArrayUnion([prompt])})
 
-        with st.chat_message("🧑"):
-            st.markdown(prompt)
+        st.markdown(f"<div style='text-align: right;'> {prompt} 🧑</div>", unsafe_allow_html=True)
         
         contents = [ types.Content(role="user", parts=[types.Part(text=prompt)]) ]
 
