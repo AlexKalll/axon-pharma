@@ -102,4 +102,16 @@ government, and update the order status of order
 
 It has been be able to call multiple functions at the same time.
 
+**Deployment Details:**
+- GitHub Actions workflow at `.github/workflows/ci.yml` that sets up Python 3.11 and installs `requirements.txt` (no tests).
+- Simple `Dockerfile` to run the Streamlit app on port 8501.
+
+Usage
+- CI: push or open a PR against `main`; it will install dependencies.
+- Docker:
+  - Build: `docker build -t axon-pharma .`
+  - Run: `docker run -p 8501:8501 axon-pharma`
+
+Note: For local Docker runs, you’ll need to pass secrets via environment or mount a .streamlit/secrets.toml/.env if required.
+
 [You are welcome to contribute!🤝 ](CONTRIBUTING.md)
