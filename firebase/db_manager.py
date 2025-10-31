@@ -1,5 +1,6 @@
 import os
 import json
+from collections.abc import Mapping
 import firebase_admin
 from firebase_admin import credentials, firestore
 try:
@@ -23,8 +24,8 @@ if not firebase_admin._apps:
             if secrets_val:
                 if isinstance(secrets_val, str):
                     cred_dict = json.loads(secrets_val)
-                elif isinstance(secrets_val, dict):
-                    cred_dict = secrets_val
+                elif isinstance(secrets_val, Mapping):
+                    cred_dict = dict(secrets_val)
 
         # 2) Environment variable (JSON string)
         if cred_dict is None:
@@ -38,9 +39,12 @@ if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
         elif cred_dict is not None:
             cred = credentials.Certificate(cred_dict)
-            firebase_admin.initialize_app(cred)
+            project_id = cred_dict.get("project_id") or cred_dict.get("projectId")
+            options = {"projectId": project_id} if project_id else None
+            firebase_admin.initialize_app(cred, options)
         else:
             # 4) Last resort: try default credentials if available
+            # If project id is available in env, Firebase will pick it up; otherwise user must set GOOGLE_CLOUD_PROJECT
             firebase_admin.initialize_app()
     except Exception as e:
         init_error = e
