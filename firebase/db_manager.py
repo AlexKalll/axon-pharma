@@ -19,12 +19,17 @@ if not firebase_admin._apps:
         if st is not None:
             secrets_val = None
             try:
-                secrets_val = st.secrets.get("FIREBASE_CREDENTIALS")
+                # Prefer explicit key lookup; some Streamlit Secrets mappings don't fully implement .get()
+                if "FIREBASE_CREDENTIALS" in st.secrets:
+                    secrets_val = st.secrets["FIREBASE_CREDENTIALS"]
                 # Also allow explicit project id in secrets
-                explicit_project_id = st.secrets.get("FIREBASE_PROJECT_ID") or st.secrets.get("GOOGLE_CLOUD_PROJECT")
+                explicit_project_id = (
+                    st.secrets.get("FIREBASE_PROJECT_ID")
+                    or st.secrets.get("GOOGLE_CLOUD_PROJECT")
+                )
             except Exception:
                 secrets_val = None
-            if secrets_val:
+            if secrets_val is not None:
                 if isinstance(secrets_val, str):
                     cred_dict = json.loads(secrets_val)
                 elif isinstance(secrets_val, Mapping):
