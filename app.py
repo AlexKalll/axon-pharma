@@ -122,6 +122,15 @@ def login_page():
     if st.button("Register Now"):
         st.session_state.current_page = "register"
         st.rerun()
+    st.markdown("---")
+    st.info("Or continue without signing in")
+    if st.button("Continue as Guest"):
+        st.session_state.logged_in = True
+        st.session_state.is_guest = True
+        st.session_state.user_email = "guest"
+        st.session_state.user_data = {"name": "Guest", "age": "N/A"}
+        st.session_state.messages = []
+        st.rerun()
 
 def register_page():
     st.title("Axon Pharmacy Registration")
@@ -169,9 +178,10 @@ def chat_page():
     # User input
     if prompt := st.chat_input("Ask about medicines, place orders, or get health advice..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        # add to the chat_history
-        user_ref = db.collection("users").document(st.session_state.user_email)
-        user_ref.update({"chat_history": firestore.ArrayUnion([prompt])})
+        # add to the chat_history for signed-in users only
+        if not st.session_state.get("is_guest", False):
+            user_ref = db.collection("users").document(st.session_state.user_email)
+            user_ref.update({"chat_history": firestore.ArrayUnion([prompt])})
 
         with st.chat_message("🧑"):
             st.markdown(prompt)
@@ -197,6 +207,7 @@ def chat_page():
 
                     i = 0
                     functions_called = []
+                    is_guest = st.session_state.get("is_guest", False)
                     user_email = st.session_state.user_email
                         
                     for fn in response.function_calls:
@@ -207,6 +218,13 @@ def chat_page():
                         tool_call = response.candidates[0].content.parts[i-1].function_call
                         if tool_call.name == "check_medicine_availability":
                             result = check_medicine_availability(**tool_call.args)
+                        elif is_guest and tool_call.name in [
+                            "place_order", "track_order", "cancel_order", "get_health_advice"
+                        ]:
+                            result = {
+                                "success": False,
+                                "message": "Guest mode: this action is not allowed. Please register or login to place, track, or cancel orders, or to get personalized advice."
+                            }
                         elif tool_call.name == "place_order":
                             result = place_order(**tool_call.args, user_email=user_email)
                         elif tool_call.name == "track_order":
@@ -249,19 +267,37 @@ def chat_page():
         st.markdown(f"**Age:** {st.session_state.user_data.get('age', 'N/A')}")
         st.markdown("---") 
         st.subheader("**What You Can Do!**")
-        st.markdown("""
-        - Check Medicine Presence
-        - Place and Cancel Orders
-        - Track your Orders
-        - Get Health Advice
-        """)
+        if st.session_state.get("is_guest", False):
+            st.markdown("""
+            - Check Medicine Presence
+            """)
+            st.info("Sign in to place orders, track/cancel orders, and get advice.")
+        else:
+            st.markdown("""
+            - Check Medicine Presence
+            - Place and Cancel Orders
+            - Track your Orders
+            - Get Health Advice
+            """)
         st.markdown("---")
         if st.button("Refresh"):
             st.session_state.messages = []
             st.rerun()
-        if st.button("Logout"):
-            st.session_state.clear()
-            st.rerun()
+        if st.session_state.get("is_guest", False):
+            if st.button("Register"):
+                st.session_state.current_page = "register"
+                st.session_state.logged_in = False
+                st.session_state.is_guest = False
+                st.rerun()
+            if st.button("Login" ):
+                st.session_state.current_page = "login"
+                st.session_state.logged_in = False
+                st.session_state.is_guest = False
+                st.rerun()
+        else:
+            if st.button("Logout"):
+                st.session_state.clear()
+                st.rerun()
         st.markdown("---")
         st.markdown("""
         <div style="text-align: center;">
@@ -276,6 +312,8 @@ def main():
         st.session_state.current_page = "login"
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
+    if "is_guest" not in st.session_state:
+        st.session_state.is_guest = False
 
     if not st.session_state.logged_in:
         if st.session_state.current_page == "login":
