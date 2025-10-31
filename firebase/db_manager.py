@@ -13,12 +13,15 @@ if not firebase_admin._apps:
     init_error = None
     try:
         cred_dict = None
+        explicit_project_id = None
 
         # 1) Streamlit secrets (supports either a JSON string or a dict)
         if st is not None:
             secrets_val = None
             try:
                 secrets_val = st.secrets.get("FIREBASE_CREDENTIALS")
+                # Also allow explicit project id in secrets
+                explicit_project_id = st.secrets.get("FIREBASE_PROJECT_ID") or st.secrets.get("GOOGLE_CLOUD_PROJECT")
             except Exception:
                 secrets_val = None
             if secrets_val:
@@ -34,6 +37,9 @@ if not firebase_admin._apps:
                 cred_dict = json.loads(env_val)
 
         # 3) Local credentials file fallback
+        if explicit_project_id and not os.getenv("GOOGLE_CLOUD_PROJECT"):
+            os.environ["GOOGLE_CLOUD_PROJECT"] = explicit_project_id
+
         if cred_dict is None and os.path.exists("firebase_credentials.json"):
             cred = credentials.Certificate("firebase_credentials.json")
             # Try to infer project_id from file
@@ -43,13 +49,15 @@ if not firebase_admin._apps:
                 project_id = _tmp.get("project_id") or _tmp.get("projectId")
             except Exception:
                 project_id = None
+            if not project_id:
+                project_id = explicit_project_id
             if project_id and not os.getenv("GOOGLE_CLOUD_PROJECT"):
                 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
             options = {"projectId": project_id} if project_id else None
             firebase_admin.initialize_app(cred, options)
         elif cred_dict is not None:
             cred = credentials.Certificate(cred_dict)
-            project_id = cred_dict.get("project_id") or cred_dict.get("projectId")
+            project_id = cred_dict.get("project_id") or cred_dict.get("projectId") or explicit_project_id
             if project_id and not os.getenv("GOOGLE_CLOUD_PROJECT"):
                 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
             options = {"projectId": project_id} if project_id else None
