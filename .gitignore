@@ -5,3 +5,5 @@ env/
 .env
 
 firebase_credentials.json
+
+/.streamlit/secrets.toml
