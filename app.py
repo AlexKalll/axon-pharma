@@ -302,8 +302,8 @@ def chat_page():
         st.markdown("""
         <div style="text-align: center;">
             <p>📱 Join our <a href="https://t.me/axon_pharmacy" target="_blank">Telegram channel</a> for updates</p>
-            <p>🌐 Visit our <a href="https://axonpharma.com" target="_blank">website</a></p>
-            <p>📞 Contact us: +251111234567</p>
+            <p>🌐 Visit our <a href="https://axon-automation.streamlit.app" target="_blank">website</a></p>
+            <p>📞 Contact us: +251119063313</p>
         </div>
         """, unsafe_allow_html=True)
 
