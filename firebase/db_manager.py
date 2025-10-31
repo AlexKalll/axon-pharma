@@ -36,10 +36,22 @@ if not firebase_admin._apps:
         # 3) Local credentials file fallback
         if cred_dict is None and os.path.exists("firebase_credentials.json"):
             cred = credentials.Certificate("firebase_credentials.json")
-            firebase_admin.initialize_app(cred)
+            # Try to infer project_id from file
+            try:
+                with open("firebase_credentials.json", "r", encoding="utf-8") as f:
+                    _tmp = json.load(f)
+                project_id = _tmp.get("project_id") or _tmp.get("projectId")
+            except Exception:
+                project_id = None
+            if project_id and not os.getenv("GOOGLE_CLOUD_PROJECT"):
+                os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+            options = {"projectId": project_id} if project_id else None
+            firebase_admin.initialize_app(cred, options)
         elif cred_dict is not None:
             cred = credentials.Certificate(cred_dict)
             project_id = cred_dict.get("project_id") or cred_dict.get("projectId")
+            if project_id and not os.getenv("GOOGLE_CLOUD_PROJECT"):
+                os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
             options = {"projectId": project_id} if project_id else None
             firebase_admin.initialize_app(cred, options)
         else:
