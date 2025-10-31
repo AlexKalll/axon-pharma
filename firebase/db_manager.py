@@ -1,13 +1,50 @@
+import os
+import json
 import firebase_admin
 from firebase_admin import credentials, firestore
+try:
+    import streamlit as st  # Available in Streamlit Cloud
+except Exception:  # Local scripts/tests may not have streamlit loaded here
+    st = None
 
-# Initialize Firebase
+# Initialize Firebase (Cloud-friendly: secrets/env/file fallbacks)
 if not firebase_admin._apps:
+    init_error = None
     try:
-        cred = credentials.Certificate("firebase_credentials.json")
-        firebase_admin.initialize_app(cred)
-        print("Firebase initialized successfully")
+        cred_dict = None
+
+        # 1) Streamlit secrets (supports either a JSON string or a dict)
+        if st is not None:
+            secrets_val = None
+            try:
+                secrets_val = st.secrets.get("FIREBASE_CREDENTIALS")
+            except Exception:
+                secrets_val = None
+            if secrets_val:
+                if isinstance(secrets_val, str):
+                    cred_dict = json.loads(secrets_val)
+                elif isinstance(secrets_val, dict):
+                    cred_dict = secrets_val
+
+        # 2) Environment variable (JSON string)
+        if cred_dict is None:
+            env_val = os.getenv("FIREBASE_CREDENTIALS")
+            if env_val:
+                cred_dict = json.loads(env_val)
+
+        # 3) Local credentials file fallback
+        if cred_dict is None and os.path.exists("firebase_credentials.json"):
+            cred = credentials.Certificate("firebase_credentials.json")
+            firebase_admin.initialize_app(cred)
+        elif cred_dict is not None:
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+        else:
+            # 4) Last resort: try default credentials if available
+            firebase_admin.initialize_app()
     except Exception as e:
-        print(f"Failed to initialize Firebase: {e}")
+        init_error = e
+        # Re-raise with a clearer message (Streamlit will redact in UI, but logs keep details)
+        raise ValueError("Failed to initialize Firebase app. Ensure FIREBASE_CREDENTIALS are set correctly in Streamlit secrets or environment, or include firebase_credentials.json.") from e
 
 db = firestore.client()

@@ -25,7 +25,7 @@ from firebase.db_manager import db
 
 load_dotenv()
 
-client = genai.Client()
+client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 st.set_page_config(
     page_title="Axon Pharmacy",
     page_icon="💊",
