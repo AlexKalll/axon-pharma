@@ -124,7 +124,7 @@ def login_page():
         st.rerun()
     st.markdown("---")
     st.info("Or continue without signing in")
-    if st.button("Continue as Guest"):
+    if st.button("Continue as Guest (No account needed)"):
         st.session_state.logged_in = True
         st.session_state.is_guest = True
         st.session_state.user_email = "guest"
@@ -170,13 +170,34 @@ def chat_page():
     st.caption("How can I help you with your pharmacy needs today?")
     st.markdown("---")
     
+    # initial greeting and quick examples
+    if len(st.session_state.messages) == 0:
+        greeting = (
+            "Welcome to Axon Pharmacy! I can help you check medicine availability, prices, and more. "
+            "You're currently in Guest mode." if st.session_state.get("is_guest", False) else 
+            "Welcome back to Axon Pharmacy! I can help you check medicines, place orders, and more."
+        )
+        examples = (
+            "\n\nTry asking:\n"
+            "- Do you have paracetamol?\n"
+            "- What's the price of doxycycline?\n"
+            "- Is insulin in stock?\n"
+            "- Check availability for citalopram\n"
+            "- Place an order of paracetamol 2 packs for me?\n"
+            "- Track my order of id <your-order-id>\n"
+            "- Cancel my order <your-order-id>\n"
+            "- give me some health advice\n"
+            + ("\n\nSign in to place, track, cancel orders, get health advice, and more." if st.session_state.get("is_guest", False) else "\n\nYou can also say: Place an order for paracetamol 2 packs.")
+        )
+        st.session_state.messages.append({"role": "assistant", "content": greeting + examples})
+
     # display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
     # User input
-    if prompt := st.chat_input("Ask about medicines, place orders, or get health advice..."):
+    if prompt := st.chat_input("Ask e.g. 'Is paracetamol in stock?' or 'Price of doxycycline'"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         # add to the chat_history for signed-in users only
         if not st.session_state.get("is_guest", False):
@@ -192,70 +213,156 @@ def chat_page():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    tools = types.Tool(function_declarations=[
+                    # quick help/price intents: answer immediately without calling tools/model
+                    handled_help = False
+                    handled_price = False
+                    lower = prompt.strip().lower()
+                    if any(phrase in lower for phrase in [
+                        "what can i do", "how to use", "help", "what can i do here", "how do i use this"
+                    ]):
+                        capabilities = [
+                            "Check medicine availability (paracetamol, doxycycline, insulin, citalopram, morphine)",
+                        ]
+                        if st.session_state.get("is_guest", False):
+                            guest_note = "You need to sign in to place orders, track/cancel orders, and get personalized advice."
+                        else:
+                            capabilities.extend([
+                                "Place orders and see total price",
+                                "Track or cancel your orders",
+                                "Get personalized health advice",
+                            ])
+                            guest_note = ""
+                        examples_text = (
+                            "\n\nExamples you can try now:\n"
+                            "- Do you have paracetamol 500mg?\n"
+                            "- What's the price of doxycycline?\n"
+                            "- Is insulin in stock?\n"
+                            "- Check availability for citalopram\n"
+                            "- place an order of paracetamol 2 packs for me\n"
+                            "- track my order of id <your-order-id>\n"
+                            "- cancel my order of id <your-order-id>\n"
+                            "- give me some health advice ... etc\n"
+                        )
+                        reply = "Here’s what you can do:\n- " + "\n- ".join(capabilities) + ("\n\n" + guest_note if guest_note else "") + examples_text
+                        st.session_state.messages.append({"role": "assistant", "content": reply})
+                        st.markdown(reply)
+                        handled_help = True
+
+                    # Price intent handler using known medicines list
+                    known_medicines = ["paracetamol", "doxycycline", "insulin", "citalopram", "morphine"]
+                    price_keywords = ["price of", "how much is", "cost of", "price for", "what's the price", "price"]
+                    mentioned = None
+                    if any(k in lower for k in price_keywords):
+                        for med in known_medicines:
+                            if med in lower:
+                                mentioned = med
+                                break
+                    if mentioned and not handled_help:
+                        availability = check_medicine_availability(mentioned)
+                        if availability.get("success"):
+                            data = availability["data"]
+                            stock = data.get("stock", 0)
+                            unit_price = data.get("unit_price", 0)
+                            if stock and stock > 0:
+                                price_msg = f"The current price of {data.get('name', mentioned)} is {unit_price}. It is in stock (qty: {stock})."
+                            else:
+                                price_msg = f"{data.get('name', mentioned)} is currently out of stock. Last listed price was {unit_price}."
+                        else:
+                            price_msg = f"I couldn't find {mentioned} in our inventory. Try another medicine."
+                        st.session_state.messages.append({"role": "assistant", "content": price_msg})
+                        st.markdown(price_msg)
+                        handled_price = True
+
+                    if not handled_help and not handled_price:
+                        tools = types.Tool(function_declarations=[
                         check_availability_function, place_order_function, track_order_function, cancel_order_function, get_health_advice_function
-                    ])
-                    config = types.GenerateContentConfig(
-                        tools=[tools],
-                        tool_config=types.ToolConfig(
-                            function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+                        ])
+                        config = types.GenerateContentConfig(
+                            tools=[tools],
+                            tool_config=types.ToolConfig(
+                                function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+                            )
                         )
-                    )
-                    
-                    chat = client.chats.create(model = "gemini-2.5-flash", config=config)
-                    response = chat.send_message(prompt)
-
-                    i = 0
-                    functions_called = []
-                    is_guest = st.session_state.get("is_guest", False)
-                    user_email = st.session_state.user_email
                         
-                    for fn in response.function_calls:
-                        i += 1
-                        st.info(f"{i}. Excuting: {fn.name}() function")
-                        functions_called.append(fn.name)
-                        
-                        tool_call = response.candidates[0].content.parts[i-1].function_call
-                        if tool_call.name == "check_medicine_availability":
-                            result = check_medicine_availability(**tool_call.args)
-                        elif is_guest and tool_call.name in [
-                            "place_order", "track_order", "cancel_order", "get_health_advice"
-                        ]:
-                            result = {
-                                "success": False,
-                                "message": "Guest mode: this action is not allowed. Please register or login to place, track, or cancel orders, or to get personalized advice."
-                            }
-                        elif tool_call.name == "place_order":
-                            result = place_order(**tool_call.args, user_email=user_email)
-                        elif tool_call.name == "track_order":
-                            result = track_order(**tool_call.args, user_email=user_email)
-                        elif tool_call.name == "cancel_order":
-                            result = cancel_order(**tool_call.args, user_email=user_email)
-                        elif tool_call.name == "get_health_advice":
-                            result = get_health_advice(**tool_call.args, user_email=user_email)
+                        chat = client.chats.create(model = "gemini-2.5-flash", config=config)
+                        response = chat.send_message(prompt)
 
-                        function_response_part = types.Part.from_function_response(
-                            name=fn.name,
-                            response={"result": result},
+                        i = 0
+                        functions_called = []
+                        is_guest = st.session_state.get("is_guest", False)
+                        user_email = st.session_state.user_email
+
+                        # Graceful handling when no tool calls are suggested by the model
+                        fn_calls = list(response.function_calls) if getattr(response, "function_calls", None) else []
+                        if len(fn_calls) == 0:
+                            capabilities = [
+                                "Check medicine availability (paracetamol, doxycycline, insulin, citalopram, morphine)",
+                            ]
+                            guest_note = "You need to sign in to place orders, track/cancel orders, and get personalized advice." if is_guest else ""
+                            if not is_guest:
+                                capabilities.extend([
+                                    "Place orders and see total price",
+                                    "Track or cancel your orders",
+                                    "Get personalized health advice",
+                                ])
+                            examples_text = (
+                                "\n\nExamples you can try now:\n"
+                                "- Do you have paracetamol 500mg?\n"
+                                "- What's the price of doxycycline?\n"
+                                "- Is insulin in stock?\n"
+                                "- Check availability for citalopram\n"
+                                + ("" if is_guest else "- Place an order of paracetamol 2 packs for me\n- Track my order of id <your-order-id>\n- Cancel my order of id <your-order-id>\n- Give me some health advice")
+                            )
+                            reply = "Here’s what you can do:\n- " + "\n- ".join(capabilities) + ("\n\n" + guest_note if guest_note else "") + examples_text
+                            st.session_state.messages.append({"role": "assistant", "content": reply})
+                            st.markdown(reply)
+                        
+                        for fn in fn_calls:
+                            i += 1
+                            st.info(f"{i}. Excuting: {fn.name}() function")
+                            functions_called.append(fn.name)
+                            
+                            tool_call = response.candidates[0].content.parts[i-1].function_call
+                            if tool_call.name == "check_medicine_availability":
+                                result = check_medicine_availability(**tool_call.args)
+                            elif is_guest and tool_call.name in [
+                                "place_order", "track_order", "cancel_order", "get_health_advice"
+                            ]:
+                                result = {
+                                    "success": False,
+                                    "message": "Guest mode: this action is not allowed. Please register or login to place, track, or cancel orders, or to get personalized advice."
+                                }
+                            elif tool_call.name == "place_order":
+                                result = place_order(**tool_call.args, user_email=user_email)
+                            elif tool_call.name == "track_order":
+                                result = track_order(**tool_call.args, user_email=user_email)
+                            elif tool_call.name == "cancel_order":
+                                result = cancel_order(**tool_call.args, user_email=user_email)
+                            elif tool_call.name == "get_health_advice":
+                                result = get_health_advice(**tool_call.args, user_email=user_email)
+
+                            function_response_part = types.Part.from_function_response(
+                                name=fn.name,
+                                response={"result": result},
+                            )
+
+                            contents.append(response.candidates[0].content) # from the model
+                            contents.append(types.Content(role="user", parts=[function_response_part])) # from the function
+                        
+                        final_response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            config=config,
+                            contents=contents
                         )
 
-                        contents.append(response.candidates[0].content) # from the model
-                        contents.append(types.Content(role="user", parts=[function_response_part])) # from the function
-                    
-                    final_response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        config=config,
-                        contents=contents
-                    )
+                        st.session_state.messages.append({"role": "model", "content": final_response.text})
 
-                    st.session_state.messages.append({"role": "model", "content": final_response.text})
-
-                    if len(functions_called) == 1:
-                        st.info(f"Function executed: {', '.join(functions_called)}")
-                    if len(functions_called) > 1:
-                        st.info(f"Functions executed are: {', '.join(functions_called)}")
-                        
-                    st.markdown(final_response.text)                    
+                        if len(functions_called) == 1:
+                            st.info(f"Function executed: {', '.join(functions_called)}")
+                        if len(functions_called) > 1:
+                            st.info(f"Functions executed are: {', '.join(functions_called)}")
+                            
+                        st.markdown(final_response.text)                    
                 except Exception as e:
                     error_msg = f"Sorry, I unable to process your request: {str(e)}, please try again."
                     st.warning(error_msg)
@@ -270,11 +377,13 @@ def chat_page():
         if st.session_state.get("is_guest", False):
             st.markdown("""
             - Check Medicine Presence
+            - Get Medicine Price
             """)
             st.info("Sign in to place orders, track/cancel orders, and get advice.")
         else:
             st.markdown("""
             - Check Medicine Presence
+            - Get Medicine Price
             - Place and Cancel Orders
             - Track your Orders
             - Get Health Advice
