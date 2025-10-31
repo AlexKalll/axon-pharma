@@ -276,7 +276,7 @@ def main():
         st.session_state.current_page = "login"
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
-    # Page routing
+
     if not st.session_state.logged_in:
         if st.session_state.current_page == "login":
             login_page()

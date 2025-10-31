@@ -4,3 +4,4 @@ google-generativeai
 firebase-admin
 google-cloud-firestore
 python-dotenv
+requests
